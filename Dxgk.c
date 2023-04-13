@@ -45,7 +45,7 @@ DxgkInitialize(
 
 
     //TODO: build a IO Contro request
-
+    RDDM_SetupIoControlReq(DeviceObject);
 
     //TODO: windows seems to unload if the following above fails
     return Status;
