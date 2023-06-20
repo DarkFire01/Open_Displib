@@ -6,73 +6,25 @@
  */
 
 #include "pdisplib.h"
+//#define NDEBUG
+#include <debug.h>
 
 /*
- *  Load the DXGKNRL.SUS
+ * Eventually we want to be able to read the OS version and use the Win8 Variant
+ * We save that for when we understand why the win8+ value is what it is
  */
-NTSTATUS
-RDDM_LoadDxgkrnl(FILE_OBJECT **FileObject, DEVICE_OBJECT **DeviceObject)
+ULONG
+RDDM_FindIoControlCode()
 {
-    NTSTATUS Status;
-    UNICODE_STRING DriverServiceName;
-    UNICODE_STRING DriverSourceName;
-   // DPRINT1("RDDM_LoadDxgkrnl: Attempting to load DXGKRNL\n");
-    RtlInitUnicodeString(&DriverServiceName, L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\DXGKrnl");
-    Status = ZwLoadDriver(&DriverServiceName);
-    if (Status != STATUS_SUCCESS)
-    {
-        DPRINT1("Failed to load DXGKrnl From WDDM miniport driver %d\n", Status);
-        return Status;
-    }
-    RtlInitUnicodeString(&DriverSourceName, L"\\Device\\DxgKrnl"); /* Taken from windows Vista->11 registry */
-
-    Status = IoGetDeviceObjectPointer(&DriverSourceName, 0xc0000000,
-                                      FileObject, DeviceObject);
- //   DPRINT1("RDDM_LoadDxgkrnl: Sucessfully Loaded DXGKRNL\n");
-    return Status;
+    /* For now just return the Vista-7 REGISTER IOCTRL */
+    return IOCTL_VIDEO_DDI_FUNC_REGISTER;
 }
 
-
-NTSTATUS
-RDDM_DeviceIoControlConfiguration(ULONG IoControlCode,
-                                  DEVICE_OBJECT *DeviceObject,
-                                  PDXGKRNL_INTERFACE DriverInitData)
-{
-    NTSTATUS Status = 0;
-    PIRP Irp;
-    IO_STATUS_BLOCK IoStatusBlock = {0};
-    KEVENT Event = {0};
-
-    KeInitializeEvent(&Event, NotificationEvent, FALSE);
-    Irp = IoBuildDeviceIoControlRequest(0x230047, //TODO: name this, was gathered via windbg (FROM VISTA RTM)
-                                        DeviceObject,
-                                        NULL,
-                                        0,
-                                        DriverInitData,
-                                        sizeof(DXGKRNL_INTERFACE),
-                                        TRUE,
-                                        &Event,
-                                        &IoStatusBlock);
-
-    Status = IofCallDriver(DeviceObject, Irp);
-    if (Status < 0) {
-       // DPRINT1("Failed to setup dxgkrnl function pointers: %d\n", Status);
-        return Status;
-    }
-
-    return STATUS_SUCCESS;
-}
-
+/* Something failed, unload driver */
 VOID
-RDDM_SetupIoControlReq(DEVICE_OBJECT *DeviceObject)
+RDDM_UnloadDxgkrnl(_In_ PUNICODE_STRING DxgkrnlServiceName)
 {
-    NTSTATUS Status;
-    DXGKRNL_INTERFACE DriverInitData; //TODO: This isn't correct
-    Status = RDDM_DeviceIoControlConfiguration(0x230047, //TODO: name this, was gathered via windbg (FROM VISTA RTM)
-                                               DeviceObject,
-                                               &DriverInitData);
-    //DPRINT1("RDDM_DeviceIoControlConfiguration left with Status %d\n", Status);
-    //DPRINT1("Miniport has detected DXGKRNL_INTERFACE size: 0x%X\n",DriverInitData.Size);
-    //DPRINT1("Miniport has detected WDDM version 0x%X\n",DriverInitData.Version);
-    //DPRINT1("Pointer to first function pointer is %X\n",DriverInitData.DxgkCbEvalAcpiMethod);
+    RtlInitUnicodeString(DxgkrnlServiceName,
+                         L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\DXGKrnl");
+    ZwUnloadDriver(DxgkrnlServiceName);
 }

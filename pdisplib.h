@@ -9,10 +9,15 @@
 #include <windef.h>
 #include <winerror.h>
 #include <stdio.h>
+#include <locd3d.h>
+#include <wdm.h>
 
-#include <d3dkmddi.h>
-#include <d3dkmthk.h>
-#include <dispmprt.h>
+/* Create an IO request to fill out the function pointer list */
+#define IOCTL_VIDEO_DDI_FUNC_REGISTER \
+	CTL_CODE( FILE_DEVICE_VIDEO, 0xF, METHOD_NEITHER, FILE_ANY_ACCESS  )
 
-NTSTATUS
-RDDM_LoadDxgkrnl();
+ULONG
+RDDM_FindIoControlCode();
+
+VOID
+RDDM_UnloadDxgkrnl(_In_ PUNICODE_STRING DxgkrnlServiceName);
